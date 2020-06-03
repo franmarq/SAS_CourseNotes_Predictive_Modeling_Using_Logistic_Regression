@@ -1,0 +1,100 @@
+*****************************************;
+** SAS Scoring Code for PROC ;
+*****************************************;
+
+length I_Ins $ 12;
+label I_Ins = 'Into: Ins' ;
+label U_Ins = 'Unnormalized Into: Ins' ;
+
+label P_Ins1 = 'Predicted: Ins=1' ;
+label P_Ins0 = 'Predicted: Ins=0' ;
+
+drop _LMR_BAD;
+_LMR_BAD=0;
+
+*** Check interval variables for missing values;
+if nmiss(DDA,DDABal,Dep,DepAmt,CashBk,Checks) then do;
+   _LMR_BAD=1;
+   goto _SKIP_000;
+end;
+
+*** Generate design variables for Res;
+drop _0_0 _0_2 ;
+length _st8 $ 8; drop _st8;
+_st8 = left(trim(put (Res, $8.)));
+_0_0= 0; 
+_0_2= 0; 
+if _st8 = 'R'  then do;
+   _0_0 = 1;
+end;
+else if _st8 = 'S'  then do;
+end;
+else if _st8 = 'U'  then do;
+   _0_2 = 1;
+end;
+else do;
+   _0_0 = .;
+   _0_2 = .;
+   _LMR_BAD=1;
+   goto _SKIP_000;
+end;
+
+*** Compute Linear Predictors;
+drop _LP0;
+_LP0 = 0;
+
+*** Effect: Res;
+_LP0 = _LP0 + (-0.01290934822666) * _0_0;
+_LP0 = _LP0 + (-0.0019077022822) * _0_2;
+*** Effect: DDA;
+_LP0 = _LP0 + (-1.04100849866437) * DDA;
+*** Effect: DDABal;
+_LP0 = _LP0 + (0.00007457167444) * DDABal;
+*** Effect: Dep;
+_LP0 = _LP0 + (-0.06815133715627) * Dep;
+*** Effect: DepAmt;
+_LP0 = _LP0 + (0.0000121517215) * DepAmt;
+*** Effect: CashBk;
+_LP0 = _LP0 + (-0.63930659872598) * CashBk;
+*** Effect: Checks;
+_LP0 = _LP0 + (-0.00067554471582) * Checks;
+
+*** Predicted values;
+drop _MAXP _IY _P0 _P1;
+_TEMP = 0.17060673004991  + _LP0;
+if (_TEMP < 0) then do;
+   _TEMP = exp(_TEMP);
+   _P0 = _TEMP / (1 + _TEMP);
+end;
+else _P0 = 1 / (1 + exp(-_TEMP));
+_P1 = 1.0 - _P0;
+P_Ins1 = _P0;
+_MAXP = _P0;
+_IY = 1;
+P_Ins0 = _P1;
+if (_P1 >  _MAXP + 1E-8) then do;
+   _MAXP = _P1;
+   _IY = 2;
+end;
+select( _IY );
+   when (1) do;
+      I_Ins = '1' ;
+      U_Ins = 1;
+   end;
+   when (2) do;
+      I_Ins = '0' ;
+      U_Ins = 0;
+   end;
+   otherwise do;
+      I_Ins = '';
+      U_Ins = .;
+   end;
+end;
+_SKIP_000:
+if _LMR_BAD = 1 then do;
+I_Ins = '';
+U_Ins = .;
+P_Ins1 = .;
+P_Ins0 = .;
+end;
+drop _TEMP;
